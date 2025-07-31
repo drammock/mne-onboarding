@@ -1,0 +1,9 @@
+name: onboarding
+channels:
+  - conda-forge
+dependencies:
+  - mne
+  - mystmd
+  # - bash_kernel
+  # - latexmk
+  # - texlive-core
