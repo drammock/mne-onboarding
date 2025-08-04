@@ -2,8 +2,12 @@ name: onboarding
 channels:
   - conda-forge
 dependencies:
+  - line_profiler
+  - memory_profiler
   - mne
   - mystmd
   # - bash_kernel
   # - latexmk
   # - texlive-core
+
+prefix: "/opt/mambaforge/envs/onboarding"
