@@ -38,35 +38,32 @@ Often a good first-pass benchmark is seeing how long it takes to run some code, 
 #### POSIX builtin `time`
 Most command-line shells have a built-in `time` utility that will report the execution time for whatever commands follow it. Use this when you have a self-contained Python script and want to benchmark execution of the entire file. For example:
 
-```{code-block} bash
-$ time python my_script.py
-# [[284972184 202504466]
-#  [202504466 285022249]]
-# 
-# real	0m0.185s
-# user	0m0.138s
-# sys	0m0.047s
+```{code-cell} ipython
+%%bash
+
+time python my_script.py
 ```
 
 Here, `real` refers to total elapsed time ("wall clock time"); `user` is the time that the CPU spent executing the `python` process; and `sys` refers to things that the CPU needed to do in order to execute the process but that the process itself isn't allowed to do for security reasons (e.g., network access, memory allocation, *etc*). Generally speaking, `user+sys` gives the total amount of CPU time used, which may be greater than `real` if the process uses multiple CPU cores in parallel.
 
-The results above show a total execution time of ~185 ms. There is no rule of thumb: whether that is "fast enough to not care" or "slow enough to be worth optimizing" is a judgment call.
+The results above show a total execution time of ~1.4 s. There is no rule of thumb: whether that is "fast enough to not care" or "slow enough to be worth optimizing" is a judgment call.
 
 #### Python `timeit` module
 If your code is a function that can't easily be made into a standalone script (e.g., a function that's part of MNE-Python), the Python `timeit` module can be a good option. It has both a command-line interface and a Python API. The command line interface has a nice feature of automatically choosing a number of repetitions of your code (which you can control yourself with the `-n` flag), chosen to make the benchmark not take too long.
 
-```{code-block} bash
+```{code-cell} ipython
+%%bash
+
 python -m timeit -s "from my_script import ARR, my_func" "my_func(ARR)"
-# 5 loops, best of 5: 63.2 msec per loop
 ```
 
-Here, we see it ran the statement `my_func(ARR)` 5 times ("5 loops") within one timing cycle, repeated that process 5 times ("best of 5"), and reports the duration of the fastest cycle divided by the number of loops (i.e., the average time it took to execute the statement once). Notice that the result is about ⅓ of what we saw when timing the entire script, because here we're measuring only the time needed to perform the function call (not the time needed to import numpy and create the input array).
+Here, we see it ran the statement `my_func(ARR)` 2 times ("2 loops") within one timing cycle, repeated that process 5 times ("best of 5"), and reports the duration of the fastest cycle divided by the number of loops (i.e., the average time it took to execute the statement once). Notice that the result is almost an order of magnitude faster than what we saw when timing the entire script, because here we're measuring only the time needed to perform the function call (not the time needed to import numpy and create the input array).
 
 You can achieve the same thing within Python; the main difference is that you *must* decide the number of loops yourself, and you only get out the total (you have to divide by the number of loops yourself):
 
 ```{code-cell} ipython
 import timeit
-n_loops = 7
+n_loops = 3
 
 total = timeit.timeit(
     stmt="my_func(ARR)",
@@ -84,13 +81,12 @@ If you're working in a Jupyter notebook, there are "magic" commands that wrap th
 ```{code-cell} ipython
 from my_script import ARR, my_func
 
-%timeit my_func(ARR)  # for one-liners
+%timeit my_func(ARR)  # single-% version for one-liners
 ```
 
 ```{code-cell} ipython
-%%timeit from time import sleep  # this line is setup code, and is not timed
+%%timeit print("this should appear only once")  # this line is setup code, and is not timed
 
-sleep(0.1)
 my_func(ARR)
 ```
 
@@ -110,33 +106,32 @@ To get line-by-line CPU usage for Python code, install [line_profiler](https://g
 
 This will write some files to the current working directory (`profile_output.lprof` and `profile_output.txt`, plus a timestamped version of the `.txt` file so you can review changes to the profiling when you run it multiple times). The terminal output of the command will tell you how to view the results:
 
-```{code-block}
+```{code-cell} ipython
+:tags: [hide-output]
+
+%%bash
+
+LINE_PROFILE=1 python my_script.py
+```
+
+The output mostly just tells you which filenames have been written to, but the last lines say:
+```
 To view details run:
 python -m line_profiler -rtmz profile_output.lprof
 ```
 
-Doing so gives you a line-by-line estimate of compute time.
+Doing so gives you a line-by-line estimate of compute time:
 
-```{code-block}
-Timer unit: 1e-06 s
+```{code-cell} ipython
+:class: hidden
 
-Total time: 0.0668348 s
-File: /home/drmccloy/Documents/academics/teaching/mne-onboarding/my_script.py
-Function: my_func at line 8
+%%bash
 
-Line #      Hits         Time  Per Hit   % Time  Line Contents
-==============================================================
-     8                                           @line_profiler.profile
-     9                                           def my_func(input_array):
-    10                                               """Compute the dot product of an array with its transpose."""
-    11         1          3.2      3.2      0.0      nrow = input_array.shape[0]
-    12         1          6.6      6.6      0.0      result = np.empty((nrow, nrow), dtype=int)
-    13         3          2.5      0.8      0.0      for rix in range(nrow):
-    14         6          7.8      1.3      0.0          for cix in range(nrow):
-    15         4      66813.6  16703.4    100.0              result[rix, cix] = np.sum(input_array[rix] * input_array.T[:, cix])
-    16         1          1.1      1.1      0.0      return result
+python -m line_profiler -rtmz profile_output.lprof > _static/lprof.txt
+```
 
-  0.07 seconds - /home/drmccloy/Documents/academics/teaching/mne-onboarding/my_script.py:8 - my_func
+```{literalinclude} _static/lprof.txt
+:filename: false
 ```
 
 Some things to notice:
@@ -152,7 +147,7 @@ The function that you're profiling doesn't need to be defined in the script you'
 ````{admonition} Profiling scripts (not functions)
 :class: dropdown hint
 
-If you're trying to profile a script, you can (temporarily) indent the whole script, and then add a few lines above and below to make it ready for profiling:
+If you're trying to profile a script (such as a tutorial for MNE-Python's documentation website), you can (temporarily) indent the whole script, and then add a few lines above and below to make it ready for profiling:
 
 ```{code-block} python
 import line_profiler
@@ -174,38 +169,26 @@ For a long time, [memory_profiler](https://github.com/pythonprofilers/memory_pro
 
 To get line-by-line memory usage for Python code, install [memory_profiler](https://github.com/pythonprofilers/memory_profiler) (available via `pip` or `conda`). As with `line_profiler`, you need to decorate the function(s) that you want to profile with an `@profile` decorator; unlike with `line_profiler`, the decorator doesn't need to be imported for it to work. Just run:
 
-```{code-block} bash
+```{code-cell} ipython
+%%bash
+
 python -m memory_profiler my_script.py
-```
-
-and you'll get output like this:
-
-```{code-block}
-Filename: my_script.py
-
-Line #    Mem usage    Increment  Occurrences   Line Contents
-=============================================================
-     7  214.098 MiB  214.098 MiB           1   @profile
-     8                                         def my_func(input_array):
-     9                                             """Compute the dot product of an array with its transpose."""
-    10  214.098 MiB    0.000 MiB           1       nrow = input_array.shape[0]
-    11  214.098 MiB    0.000 MiB           1       result = np.empty((nrow, nrow), dtype=int)
-    12  214.156 MiB    0.000 MiB           3       for rix in range(nrow):
-    13  214.156 MiB    0.000 MiB           6           for cix in range(nrow):
-    14  214.156 MiB    0.059 MiB           4               result[rix, cix] = np.sum(input_array[rix] * input_array.T[:, cix])
-    15  214.156 MiB    0.000 MiB           1       return result
 ```
 
 Here the results are  not very interesting, because the output array we're allocating is small, and the (larger) input array was allocated *outside* the function call, so it just shows up in the baseline `Mem usage` at the start of the function.
 
 If you want to generate a graph of the memory usage over time, you can run
 
-```{code-block} bash
+```{code-cell} ipython
+%%bash
+
 mprof run my_script.py
-mprof plot
+mprof plot --output _static/mprof.png
 ```
 
-The `run` subcommand will generate a file (`mprofile_20250801173039.dat` or so) and the `plot` subcommand automatically uses the file with the most recent timestamp.
+![plot of memory usage on the vertical axis and time on the horizontal axis, showing ](_static/mprof.png)
+
+The `run` subcommand will generate a file (`mprofile_20250804091557.dat` or so) and the `plot` subcommand automatically plots the data the file with the most recent timestamp.
 
 <!-- TODO insert plot -->
 
