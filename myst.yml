@@ -1,12 +1,12 @@
 # See docs at: https://mystmd.org/guide/frontmatter
 version: 1
 project:
-  id: 183c951c-1e23-4214-a572-2d42f5719a38
+  id: 2b405a41-501e-4bb2-8241-cf3982c7360c
   # title:
   # description:
   # keywords: []
   # authors: []
-  # github:
+  github: https://github.com/drammock/mne-onboarding
   # To autogenerate a Table of Contents, run "myst init --write-toc"
 site:
   title: MNE-Python maintainer onboarding
