@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 trap ctrl_c INT
 
 ctrl_c () {
@@ -8,4 +9,5 @@ PORT=8888
 export JUPYTER_BASE_URL="http://localhost:${PORT}"
 export JUPYTER_TOKEN="foo"
 jupyter server --IdentityProvider.token="${JUPYTER_TOKEN}" --ServerApp.port="${PORT}" &
+sleep 1
 myst start --execute
