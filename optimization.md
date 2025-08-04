@@ -85,7 +85,7 @@ from script import ARR, my_func
 ```
 
 ```{code-cell} ipython
-%%timeit print("this should appear only once")  # this line is setup code, and is not timed
+%%timeit import time; time.sleep(0.01)  # this line is setup code, and is not timed
 
 my_func(ARR)
 ```
@@ -104,6 +104,13 @@ To get line-by-line CPU usage for Python code, install [line_profiler](https://g
 1. in the script where your function is defined, `import line_profiler` and decorate the function with `@line_profiler.profile`
 2. call the script like this: `LINE_PROFILE=1 python script.py`
 
+Here's what that looks like:
+
+```{include} script_lprof.py
+:lang: python
+:class: collapse
+```
+
 This will write some files to the current working directory (`profile_output.lprof` and `profile_output.txt`, plus a timestamped version of the `.txt` file so you can review changes to the profiling when you run it multiple times). The terminal output of the command will tell you how to view the results:
 
 ```{code-cell} ipython
@@ -111,7 +118,7 @@ This will write some files to the current working directory (`profile_output.lpr
 
 %%bash
 
-LINE_PROFILE=1 python script.py
+LINE_PROFILE=1 python script_lprof.py
 ```
 
 The output mostly just tells you which filenames have been written to, but the last lines say:
@@ -123,8 +130,6 @@ python -m line_profiler -rtmz profile_output.lprof
 Doing so gives you a line-by-line estimate of compute time:
 
 ```{code-cell} ipython
-:class: hidden
-
 %%bash
 
 python -m line_profiler -rtmz profile_output.lprof > _static/lprof.txt
