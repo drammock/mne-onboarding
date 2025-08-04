@@ -1,3 +1,7 @@
 _build
 __pycache__
 .ipynb_checkpoints
+
+profile_output*.txt
+profile_output.lprof
+mprofile_*.dat
