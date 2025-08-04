@@ -27,7 +27,7 @@ It is generally encouraged to optimize code only *after* the program has been wr
 
 Here's an example script that we'll use for benchmarking practice.
 
-```{include} my_script.py
+```{include} script.py
 :lang: python
 ```
 
@@ -41,7 +41,7 @@ Most command-line shells have a built-in `time` utility that will report the exe
 ```{code-cell} ipython
 %%bash
 
-time python my_script.py
+time python script.py
 ```
 
 Here, `real` refers to total elapsed time ("wall clock time"); `user` is the time that the CPU spent executing the `python` process; and `sys` refers to things that the CPU needed to do in order to execute the process but that the process itself isn't allowed to do for security reasons (e.g., network access, memory allocation, *etc*). Generally speaking, `user+sys` gives the total amount of CPU time used, which may be greater than `real` if the process uses multiple CPU cores in parallel.
@@ -54,7 +54,7 @@ If your code is a function that can't easily be made into a standalone script (e
 ```{code-cell} ipython
 %%bash
 
-python -m timeit -s "from my_script import ARR, my_func" "my_func(ARR)"
+python -m timeit -s "from script import ARR, my_func" "my_func(ARR)"
 ```
 
 Here, we see it ran the statement `my_func(ARR)` 2 times ("2 loops") within one timing cycle, repeated that process 5 times ("best of 5"), and reports the duration of the fastest cycle divided by the number of loops (i.e., the average time it took to execute the statement once). Notice that the result is almost an order of magnitude faster than what we saw when timing the entire script, because here we're measuring only the time needed to perform the function call (not the time needed to import numpy and create the input array).
@@ -67,7 +67,7 @@ n_loops = 3
 
 total = timeit.timeit(
     stmt="my_func(ARR)",
-    setup="from my_script import ARR, my_func",
+    setup="from script import ARR, my_func",
     number=n_loops,
 )
 
@@ -79,7 +79,7 @@ f"average time to execute statement: {total / n_loops:6f} seconds"
 If you're working in a Jupyter notebook, there are "magic" commands that wrap the `timeit` module too:
 
 ```{code-cell} ipython
-from my_script import ARR, my_func
+from script import ARR, my_func
 
 %timeit my_func(ARR)  # single-% version for one-liners
 ```
@@ -102,7 +102,7 @@ In data analysis contexts, it can sometimes be helpful to log the execution time
 To get line-by-line CPU usage for Python code, install [line_profiler](https://github.com/pyutils/line_profiler) (available via `pip` or `conda`). The tool *only works on functions*, and is enabled by a 2-step process:
 
 1. in the script where your function is defined, `import line_profiler` and decorate the function with `@line_profiler.profile`
-2. call the script like this: `LINE_PROFILE=1 python my_script.py`
+2. call the script like this: `LINE_PROFILE=1 python script.py`
 
 This will write some files to the current working directory (`profile_output.lprof` and `profile_output.txt`, plus a timestamped version of the `.txt` file so you can review changes to the profiling when you run it multiple times). The terminal output of the command will tell you how to view the results:
 
@@ -111,7 +111,7 @@ This will write some files to the current working directory (`profile_output.lpr
 
 %%bash
 
-LINE_PROFILE=1 python my_script.py
+LINE_PROFILE=1 python script.py
 ```
 
 The output mostly just tells you which filenames have been written to, but the last lines say:
@@ -172,7 +172,7 @@ To get line-by-line memory usage for Python code, install [memory_profiler](http
 ```{code-cell} ipython
 %%bash
 
-python -m memory_profiler my_script.py
+python -m memory_profiler script.py
 ```
 
 Here the results are  not very interesting, because the output array we're allocating is small, and the (larger) input array was allocated *outside* the function call, so it just shows up in the baseline `Mem usage` at the start of the function.
@@ -182,7 +182,7 @@ If you want to generate a graph of the memory usage over time, you can run
 ```{code-cell} ipython
 %%bash
 
-mprof run my_script.py
+mprof run script.py
 mprof plot --output _static/mprof.png
 ```
 
