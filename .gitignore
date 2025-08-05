@@ -5,3 +5,6 @@ __pycache__
 profile_output*.txt
 profile_output.lprof
 mprofile_*.dat
+lprof_*.txt
+mprof_*.txt
+mprof.png
