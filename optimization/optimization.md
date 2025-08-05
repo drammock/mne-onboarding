@@ -17,11 +17,11 @@ Benchmarking
 : Running code (usually multiple times) and measuring the resources (CPU time, memory, disk space, and/or network usage) necessary to execute it. If the code takes inputs, benchmarking usually involves testing inputs of different sizes or types.
 
 Optimization
-: Modifying code to reduce its resource consumption. Note that reduced consumption may vary with the size or type of input; optimizing a function to be really efficient for small 1-dimensional array input is unhelpful if the typical user will be passing in large 3-dimensional arrays.
+: Modifying code to reduce its resource consumption. Note that reduced consumption may vary with the size or type of input; optimizing a function to be really efficient for small 1-dimensional array input is unhelpful if the optimizations aren't as effective for the sizes and shapes of arrays that users typically pass to the function.
 
 ## When to optimize
 
-It is generally encouraged to optimize code only *after* the program has been written (i.e., all features are implemented, and the code is tested and believed to be bug-free) and *after* it has been benchmarked. If you optimize before the code is finished (e.g., as you're writing it), you risk wasting that effort (by later re-writing that part of the code) because your partial implementation was buggy, or because it didn't account for all the planned features. As the quote from {cite}`10.1145/356635.356640` makes clear, it is also considered a best practice to optimize only after benchmarking: programmer instincts are often wrong about about which lines of code are the performance bottleneck.
+It is generally encouraged to optimize code only *after* the program has been written (i.e., all features are implemented, and the code is tested and believed to be bug-free). If you optimize before the code is finished (e.g., as you're writing it), you risk wasting that effort (by later re-writing that part of the code) because your partial implementation was buggy, or because it didn't account for all the planned features. And as the quote from {cite}`10.1145/356635.356640` makes clear, it is also considered a best practice to optimize only after benchmarking: programmer instincts are often wrong about about which lines of code are the performance bottleneck.
 
 ## Simple benchmarking
 
@@ -29,6 +29,8 @@ Here's an example script that we'll use for benchmarking practice.
 
 ```{include} script.py
 :lang: python
+:linenos:
+:caption: Our starting point: the unoptimized script
 ```
 
 ### Measuring speed
@@ -46,7 +48,7 @@ time python script.py
 
 Here, `real` refers to total elapsed time ("wall clock time"); `user` is the time that the CPU spent executing the `python` process; and `sys` refers to things that the CPU needed to do in order to execute the process but that the process itself isn't allowed to do for security reasons (e.g., network access, memory allocation, *etc*). Generally speaking, `user+sys` gives the total amount of CPU time used, which may be greater than `real` if the process uses multiple CPU cores in parallel.
 
-The results above show a total execution time of ~1.4 s. There is no rule of thumb: whether that is "fast enough to not care" or "slow enough to be worth optimizing" is a judgment call.
+The results above show a total execution time of ~1.4 s. ***There is no rule of thumb:*** whether that is "fast enough to not care" or "slow enough to be worth optimizing" is a judgment call.
 
 #### Python `timeit` module
 If your code is a function that can't easily be made into a standalone script (e.g., a function that's part of MNE-Python), the Python `timeit` module can be a good option. It has both a command-line interface and a Python API. The command line interface has a nice feature of automatically choosing a number of repetitions of your code (which you can control yourself with the `-n` flag), chosen to make the benchmark not take too long.
@@ -109,6 +111,10 @@ Here we'll use the function decorator:
 
 ```{include} script_lprof.py
 :lang: python
+:linenos:
+:lineno-match:
+:end-line: 16
+:emphasize-lines: 2,8
 ```
 
 Next, call the script like this: `LINE_PROFILE=1 python script.py`. This will write some files to the current working directory (`profile_output.lprof` and `profile_output.txt`, plus a timestamped version of the `.txt` file so you can review changes to the profiling when you run it multiple times).
@@ -140,6 +146,8 @@ python -m line_profiler -rtmz profile_output.lprof > lprof_output.txt
 ```{literalinclude} lprof_output.txt
 :label: lprof-orig
 :caption: CPU profiling of the initial (unoptimized) script
+:filename: false
+:enumerated: false
 ```
 
 Some things to notice:
@@ -179,6 +187,10 @@ To get line-by-line memory usage for Python code, install [memory_profiler](http
 
 ```{include} script_mprof.py
 :lang: python
+:lines: 1-16
+:linenos:
+:lineno-match:
+:emphasize-lines: 7
 ```
 
 ```{code-cell} ipython
@@ -189,6 +201,7 @@ python -m memory_profiler script_mprof.py > mprof_output.txt
 ```
 
 ```{literalinclude} mprof_output.txt
+:filename: false
 ```
 
 Here the results are not very interesting, because the output array we're allocating is too small to notice (a 2 × 2 array of `int`s is only 32 *bytes*, or 0.00003 MiB), and the (larger) input array was allocated *outside* the function call, so it just shows up in the baseline `Mem usage` at the start of the function.
@@ -212,10 +225,12 @@ Now that we've benchmarked our script, how can we optimize it? There are a few s
 
 In our script we're manually accumulating the sum of $r_i \times c_j$ products in a for-loop:
 
-```{include} script.py
+```{include} script_lprof.py
 :lang: python
-:start-line: 10
-:end-line: 13
+:linenos:
+:lineno-match:
+:lines: 13-16
+:emphasize-lines: 15-16
 :filename: false
 ```
 
@@ -223,11 +238,11 @@ We can eliminate the innermost for-loop using the built-in `np.sum` function:
 
 ```{include} script_sum.py
 :lang: python
-:start-line: 12
-:end-line: 14
-:filename: false
 :linenos:
 :lineno-match:
+:lines: 13-15
+:emphasize-lines: 15
+:filename: false
 ```
 
 ```{code-cell} ipython
@@ -242,6 +257,8 @@ python -m line_profiler -rtmz profile_output.lprof > lprof_sum.txt
 ```{literalinclude} lprof_sum.txt
 :label: lprof-sum
 :caption: CPU profiling after switching to use np.sum
+:filename: false
+:enumerated: false
 ```
 
 We went from 0.43 *seconds* runtime for [the original script](#lprof-orig) to around 750 *microseconds* just by using `np.sum`!
@@ -252,11 +269,11 @@ We could try to go further and use [broadcasting](https://numpy.org/doc/stable/u
 
 ```{include} script_broadcast.py
 :lang: python
-:start-line: 12
-:end-line: 14
-:filename: false
 :linenos:
 :lineno-match:
+:lines: 13-15
+:emphasize-lines: 14
+:filename: false
 ```
 
 ```{code-cell} ipython
@@ -269,6 +286,9 @@ python -m line_profiler -rtmz profile_output.lprof > lprof_broadcast.txt
 ```
 
 ```{literalinclude} lprof_broadcast.txt
+:label: lprof-bcast
+:caption: CPU profiling after eliminating a loop with broadcasting
+:filename: false
 ```
 
 This time we went from 750 microseconds for [the version using np.sum](#lprof-sum) to around 1 *millisecond* — a slowdown! Let's see how the memory performance looks:
@@ -280,6 +300,8 @@ python -m memory_profiler script_bcast_mprof.py > mprof_bcast.txt
 ```
 
 ```{literalinclude} mprof_bcast.txt
+:caption: Memory profiling after eliminating a loop with broadcasting
+:filename: false
 ```
 
 It uses more memory too! (Note the increment on line 13). The code is also arguably less readable, so we should probably abandon this approach. In practice, after the initial *huge* speedup due to `np.sum`, most experienced programmers would have said "good enough" and stopped there. Again, there is no one-size-fits-all criterion; when to optimize (and when to stop further optimization attempts) is always a judgment call.
@@ -288,11 +310,12 @@ At this point, you're probably screaming "but what about `@`!!" Indeed, just usi
 
 ```{include} script_dot.py
 :lang: python
-:start-line: 8
-:end-line: 11
-:filename: false
 :linenos:
 :lineno-match:
+:lines: 9-12
+:filename: false
+:emphasize-lines: 11
+:caption: The obvious approach, using `@` (the `np.dot` infix operator)
 ```
 
 At this point we wouldn't even need to define our own function anymore. So how does it stack up?
@@ -307,9 +330,12 @@ python -m line_profiler -rtmz profile_output.lprof > lprof_dot.txt
 ```
 
 ```{literalinclude} lprof_dot.txt
+:label: lprof-dot
+:caption: CPU profiling using the `@` infix operator
+:filename: false
 ```
 
-Down from 750 microseconds to around 260 microseconds. So in case the `np.sum` results above weren't convincing, here's further evidence that using NumPy built-in functions will almost always yield more efficient code than implementing the same computations yourself.
+Down from 750 microseconds to around 250 microseconds. So in case the `np.sum` results above weren't convincing, here's further evidence that using NumPy built-in functions will almost always yield more efficient code than implementing the same computations yourself.
 
 ### Some pitfalls to avoid
 
@@ -318,7 +344,7 @@ Generally speaking, there are a few patterns that (almost) always work to speed 
 - *Pre-allocate arrays instead of growing them incrementally*. Avoid using `np.concatenate`, `np.stack`, *etc.* inside for-loops.
 - *Re-use the input array*. If you aren't going to need the input array and it's already the shape you need for your output: many NumPy functions have an `out=` parameter, that specifies an *existing* array to write into (instead of allocating and returning a new array). For very large arrays, this can cut down on memory usage considerably.
 - *Don't be fooled by `np.vectorize`*. You may be tempted by the name, but `np.vectorize` is built for broadcasting convenience, not for speed. In most cases it won't speed up complex computations that don't have a built-in NumPy equivalent.
-- *Consider `np.einsum`*. An explanation of how `np.einsum` works is beyond the scope of this tutorial, but in some cases it can reduce computation and memory usage, usually re-ordering computations so that operations that reduce the dimensionality happen earlier (thereby eliminating some of the broadcasting that would otherwise have occurred).
+- *Consider `np.einsum`*. An explanation of how `np.einsum` works is beyond the scope of this tutorial, but in some cases it can reduce computation and memory usage, usually by re-ordering computations so that operations that reduce the dimensionality happen earlier (thereby eliminating some of the broadcasting that would otherwise have occurred).
 
 ## Optimizing with Numba
 
@@ -331,10 +357,10 @@ Let's try it with our example above, starting with the naive two-loop code, but 
 ```{include} script_numba.py
 :lang: python
 :filename: false
-:start-line: 1
-:end-line: 11
+:end-line: 16
 :linenos:
 :lineno-match:
+:emphasize-lines: 2,8,12
 ```
 
 ```{code-cell} ipython
@@ -344,9 +370,9 @@ python -m timeit -s "from script_numba import ARR, my_func, np; my_func(np.ones(
 ```
 There are a few notable things here:
 
-1. First, the speed is faster than the naive, `sum`, and `broadcast` code, rivaling NumPy's `@` directly. The `@` operator in NumPy calls highly optimized BLAS linear algebra routines, utilizing SIMD (single-instruction multiple-data) CPU instructions and multiple threads, so it can in some situations beat Numba. But Numba also can make use of SIMD instructions, so results can vary!
+1. First, the speed is faster than the [naive](#lprof-orig), [`sum`](#lprof-sum), and [`broadcast`](#lprof-bcast) results, rivaling [using NumPy's `@`](#lprof-dot) directly. The `@` operator in NumPy calls highly optimized BLAS linear algebra routines, utilizing SIMD (single-instruction multiple-data) CPU instructions and multiple threads, so it can in some situations beat Numba. But Numba also can make use of SIMD instructions, so results can vary!
 2. We had to tweak the `dtype=int` to be `dtype=np.int64` for the `result` inside the loop. This is because `nopython` mode needs explicit NumPy dtypes. Another (maybe better) option here would be to use `dtype=input.dtype`.
-3. In the `timeit` call, we call the function once in the *setup* phase. This triggers the JIT compilation. From then on, it can be used by the repeated calls to `my_func` thaht `timeit` will do under the hood. Without this step, the JIT compilation time would (misleadingly) be included in the `timeit` stats.
+3. In the `timeit` call, we call the function once in the *setup* phase. This triggers the JIT compilation. From then on, it can be used by the repeated calls to `my_func` that `timeit` will do under the hood. Without this step, the JIT compilation time would (misleadingly) be included in the `timeit` stats.
 
 ### A more complex example
 
@@ -354,6 +380,7 @@ You can see a more complex example of this in the MNE-Python code for computing 
 
 ```{code-block} python
 :linenos:
+:emphasize-lines: 7,11-12,22
 
 @jit()
 def _fast_fit_snr(this_data, n_freqs, model, inv_model, mag_picks, grad_picks):
@@ -385,6 +412,6 @@ def _fast_fit_snr(this_data, n_freqs, model, inv_model, mag_picks, grad_picks):
 
 A few things to note:
 
-- *There are several calls to `np.ascontiguousarray`*. Many NumPy functions are faster if performed on arrays stored in C-contiguous order in memory. Numba will warn you if it detects this.
-- *The `axis` parameter might not be allowed*. The comment on line 11 calls out one such case, so that future developers don't recognize the familiar formula for variance and try to speed things up by using `np.var`. Note that it's not *always* forbidden; on line 14 we see the `.sum(axis=1)` method called on an array. The Numba documentation is fairly clear about what is allowed, but in any case the Numba compiler will complain if you try to use a NumPy feature that it doesn't support.
+- *There are several calls to `np.ascontiguousarray`*. Many NumPy functions are faster if performed on arrays stored in C-contiguous order in memory. Numba will warn you if it detects those functions being called on non-contiguous arrays.
+- *The `axis` parameter might not be allowed*. The comment on line 11 calls out one such case, so that future developers don't recognize the familiar formula for variance and try to speed things up by using `np.var`. Note that it's not *always* forbidden; on line 22 we see the `.sum(axis=1)` method called on an array. The Numba documentation is fairly clear about what is allowed, but in any case the Numba compiler will complain if you try to use a NumPy feature that it doesn't support.
 - *The `@jit` decorator is a wrapper*. In MNE-Python, we re-define Numba's decorator to still work even if the user doesn't have Numba installed. We also set `nopython=True, nogil=True, fastmath=True, cache=True` in all in-repo `jit` calls by default. [See how we do it](https://github.com/mne-tools/mne-python/blob/f04fcaa851e64b379a1a107f18cf3fd5b6b18f42/mne/fixes.py#L600-L640).

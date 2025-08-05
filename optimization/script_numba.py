@@ -1,15 +1,15 @@
 import numpy as np
-from numba import jit  # ADDED!!!
+from numba import jit
 
 n = 100_000
 ARR = np.random.default_rng(seed=8675309).integers(10, size=(2, n))
 
 
-@jit(nopython=True)  # ADDED!!!
+@jit(nopython=True)
 def my_func(input_array):
     """Compute the dot product of an array with its transpose."""
     nrow, ncol = input_array.shape
-    result = np.zeros((nrow, nrow), dtype=np.int64)  # CHANGED!!!
+    result = np.zeros((nrow, nrow), dtype=np.int64)
     for rix in range(nrow):
         for cix in range(nrow):
             for eix in range(ncol):
