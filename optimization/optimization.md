@@ -99,19 +99,19 @@ In data analysis contexts, it can sometimes be helpful to log the execution time
 
 ### Measuring CPU usage
 
-To get line-by-line CPU usage for Python code, install [line_profiler](https://github.com/pyutils/line_profiler) (available via `pip` or `conda`). The tool *only works on functions*, and is enabled by a 2-step process:
+To get line-by-line CPU usage for Python code, install [line_profiler](https://github.com/pyutils/line_profiler) (available via `pip` or `conda`). Selecting portions of code to profile is done in one of three ways:
 
-1. in the script where your function is defined, `import line_profiler` and decorate the function with `@line_profiler.profile`
-2. call the script like this: `LINE_PROFILE=1 python script.py`
+- `import line_profiler` and then decorate a function with `@line_profiler.profile`.
+- `from line_profiler import profile` and then call `profile.enable()` and `profile.disable()` to start/stop profiling.
+- `from line_profiler import profile` and use the `with profile:` context manager.
 
-Here's what that looks like:
+Here we'll use the function decorator:
 
 ```{include} script_lprof.py
 :lang: python
-:class: collapse
 ```
 
-This will write some files to the current working directory (`profile_output.lprof` and `profile_output.txt`, plus a timestamped version of the `.txt` file so you can review changes to the profiling when you run it multiple times). The terminal output of the command will tell you how to view the results:
+Next, call the script like this: `LINE_PROFILE=1 python script.py`. This will write some files to the current working directory (`profile_output.lprof` and `profile_output.txt`, plus a timestamped version of the `.txt` file so you can review changes to the profiling when you run it multiple times).
 
 ```{code-cell} ipython
 :tags: [hide-output]
@@ -121,7 +121,8 @@ This will write some files to the current working directory (`profile_output.lpr
 LINE_PROFILE=1 python script_lprof.py
 ```
 
-The output mostly just tells you which filenames have been written to, but the last lines say:
+The terminal output mostly just tells you which filenames have been written to, but the last lines say:
+
 ```
 To view details run:
 python -m line_profiler -rtmz profile_output.lprof
@@ -132,11 +133,13 @@ Doing so gives you a line-by-line estimate of compute time:
 ```{code-cell} ipython
 %%bash
 
-python -m line_profiler -rtmz profile_output.lprof > _static/lprof.txt
+python -m line_profiler -rtmz profile_output.lprof > lprof_output.txt
+# file redirection is just for nicer formatting    ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
 ```
 
-```{literalinclude} _static/lprof.txt
-:filename: false
+```{literalinclude} lprof_output.txt
+:label: lprof-orig
+:caption: CPU profiling of the initial (unoptimized) script
 ```
 
 Some things to notice:
@@ -172,39 +175,190 @@ if __name__ == "__main__":
 For a long time, [memory_profiler](https://github.com/pythonprofilers/memory_profiler) was the go-to choice for measuring memory usage. It is still in widespread use, but is currently unmaintained. You may want to try out [memray](https://bloomberg.github.io/memray/index.html) instead.
 ```
 
-To get line-by-line memory usage for Python code, install [memory_profiler](https://github.com/pythonprofilers/memory_profiler) (available via `pip` or `conda`). As with `line_profiler`, you need to decorate the function(s) that you want to profile with an `@profile` decorator; unlike with `line_profiler`, the decorator doesn't need to be imported for it to work. Just run:
+To get line-by-line memory usage for Python code, install [memory_profiler](https://github.com/pythonprofilers/memory_profiler) (available via `pip` or `conda`). As with `line_profiler`, you need to decorate the function(s) that you want to profile with a `@profile` decorator; unlike with `line_profiler`, the decorator doesn't need to be imported for it to work:
+
+```{include} script_mprof.py
+:lang: python
+```
 
 ```{code-cell} ipython
 %%bash
 
-python -m memory_profiler script.py
+python -m memory_profiler script_mprof.py > mprof_output.txt
+# redirection → nicer output formatting   ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
 ```
 
-Here the results are  not very interesting, because the output array we're allocating is small, and the (larger) input array was allocated *outside* the function call, so it just shows up in the baseline `Mem usage` at the start of the function.
+```{literalinclude} mprof_output.txt
+```
 
-If you want to generate a graph of the memory usage over time, you can run
+Here the results are not very interesting, because the output array we're allocating is too small to notice (a 2 × 2 array of `int`s is only 32 *bytes*, or 0.00003 MiB), and the (larger) input array was allocated *outside* the function call, so it just shows up in the baseline `Mem usage` at the start of the function.
+
+If you want to generate a graph of the memory usage over time, you can run `mprof plot`; it will automatically use the most recent `mprofile_*.dat` file in the current directory. If you *only* want the graph (not the line-by-line info) you can also use the shorter command `mprof run script_mprof.py` to just write out the `*dat` file, instead of the longer `python -m memory_profiler script_mprof.py` as above.
 
 ```{code-cell} ipython
 %%bash
 
-mprof run script.py
-mprof plot --output _static/mprof.png
+mprof run script_mprof.py
+mprof plot --output mprof.png
 ```
 
-![plot of memory usage on the vertical axis and time on the horizontal axis, showing ](_static/mprof.png)
-
-The `run` subcommand will generate a file (`mprofile_20250804091557.dat` or so) and the `plot` subcommand automatically plots the data the file with the most recent timestamp.
-
-<!-- TODO insert plot -->
+![plot of memory usage on the vertical axis and time on the horizontal axis. The line shows a steady increase from 0 to 63 MiB from 0 to about 0.3 seconds, then holds constant at 63 MiB until 0.5 seconds. Brackets indicate that the function `my_func` executed between 0.3 and about 0.46 seconds.](mprof.png)
 
 ## Optimizing with NumPy
 
-- use NumPy builtins
-- cut out for-loops and use broadcasting
-- NB: `np.vectorize` doesn't help you here! It's built for broadcasting convenience, not speed (so you can start with a sequence of objects, do your custom operation on them, and end up with an array).
-- pre-allocate arrays instead of growing them
-- many NumPy functions have an `out=` parameter, that specifies an *existing* array to write into (instead of allocating and returning a new array). For very large arrays, consider overwriting the input array if it's safe to do so.
+Now that we've benchmarked our script, how can we optimize it? There are a few strategies to pursue, given here in rough order from easiest to most difficult.
+
+### Use NumPy builtins
+
+In our script we're manually accumulating the sum of $r_i \times c_j$ products in a for-loop:
+
+```{include} script.py
+:lang: python
+:start-line: 10
+:end-line: 13
+:filename: false
+```
+
+We can eliminate the innermost for-loop using the built-in `np.sum` function:
+
+```{include} script_sum.py
+:lang: python
+:start-line: 12
+:end-line: 14
+:filename: false
+:linenos:
+:lineno-match:
+```
+
+```{code-cell} ipython
+:tags: [remove-output]
+
+%%bash
+
+LINE_PROFILE=1 python script_sum.py
+python -m line_profiler -rtmz profile_output.lprof > lprof_sum.txt
+```
+
+```{literalinclude} lprof_sum.txt
+:label: lprof-sum
+:caption: CPU profiling after switching to use np.sum
+```
+
+We went from 0.43 *seconds* runtime for [the original script](#lprof-orig) to around 750 *microseconds* just by using `np.sum`!
+
+### Use NumPy broadcasting
+
+We could try to go further and use [broadcasting](https://numpy.org/doc/stable/user/basics.broadcasting.html) to eliminate another level of for-loop nesting:
+
+```{include} script_broadcast.py
+:lang: python
+:start-line: 12
+:end-line: 14
+:filename: false
+:linenos:
+:lineno-match:
+```
+
+```{code-cell} ipython
+:tags: [remove-output]
+
+%%bash
+
+LINE_PROFILE=1 python script_broadcast.py
+python -m line_profiler -rtmz profile_output.lprof > lprof_broadcast.txt
+```
+
+```{literalinclude} lprof_broadcast.txt
+```
+
+This time we went from 750 microseconds for [the version using np.sum](#lprof-sum) to around 1 *millisecond* — a slowdown! Let's see how the memory performance looks:
+
+```{code-cell} ipython
+%%bash
+
+python -m memory_profiler script_bcast_mprof.py > mprof_bcast.txt
+```
+
+```{literalinclude} mprof_bcast.txt
+```
+
+It uses more memory too! (Note the increment on line 13). The code is also arguably less readable, so we should probably abandon this approach. In practice, after the initial *huge* speedup due to `np.sum`, most experienced programmers would have said "good enough" and stopped there. Again, there is no one-size-fits-all criterion; when to optimize (and when to stop further optimization attempts) is always a judgment call.
+
+At this point, you're probably screaming "but what about `@`!!" Indeed, just using the built-in NumPy matrix multiplication is *much much* better than anything we've done so far, if for no other reason than the improved readability of the code:
+
+```{include} script_dot.py
+:lang: python
+:start-line: 8
+:end-line: 11
+:filename: false
+:linenos:
+:lineno-match:
+```
+
+At this point we wouldn't even need to define our own function anymore. So how does it stack up?
+
+```{code-cell} ipython
+:tags: [remove-output]
+
+%%bash
+
+LINE_PROFILE=1 python script_dot.py
+python -m line_profiler -rtmz profile_output.lprof > lprof_dot.txt
+```
+
+```{literalinclude} lprof_dot.txt
+```
+
+Down from 750 microseconds to around 260 microseconds. So in case the `np.sum` results above weren't convincing, here's further evidence that using NumPy built-in functions will almost always yield more efficient code than implementing the same computations yourself.
+
+### Some pitfalls to avoid
+
+Generally speaking, there are a few patterns that (almost) always work to speed up scientific Python code and/or reduce memory usage:
+
+- *Pre-allocate arrays instead of growing them incrementally*. Avoid using `np.concatenate`, `np.stack`, *etc.* inside for-loops.
+- *Re-use the input array*. If you aren't going to need the input array and it's already the shape you need for your output: many NumPy functions have an `out=` parameter, that specifies an *existing* array to write into (instead of allocating and returning a new array). For very large arrays, this can cut down on memory usage considerably.
+- *Don't be fooled by `np.vectorize`*. You may be tempted by the name, but `np.vectorize` is built for broadcasting convenience, not for speed. In most cases it won't speed up complex computations that don't have a built-in NumPy equivalent.
+- *Consider `np.einsum`*. An explanation of how `np.einsum` works is beyond the scope of this tutorial, but in some cases it can reduce computation and memory usage, usually re-ordering computations so that operations that reduce the dimensionality happen earlier (thereby eliminating some of the broadcasting that would otherwise have occurred).
 
 ## Optimizing with Numba
 
-TODO
+For complex computations that need to be called repeatedly (e.g., a computation applied to a window, where the window slides along a time series), rewriting the function to use Numba (which will just-in-time compile the function to optimized bytecode) might be worth the effort. Unfortunately, Numba only allows a subset of the NumPy API in functions that it compiles, so some re-writing may be necessary.
+
+You can see an example of this in the MNE-Python code for computing the SNR of {abbr}`cHPI (continuous Head Position Indicator)` coils:
+
+```{code-block} python
+:linenos:
+
+@jit()
+def _fast_fit_snr(this_data, n_freqs, model, inv_model, mag_picks, grad_picks):
+    # first or last window
+    if this_data.shape[1] != model.shape[0]:
+        model = model[: this_data.shape[1]]
+        inv_model = np.linalg.pinv(model)
+    coefs = np.ascontiguousarray(inv_model) @ np.ascontiguousarray(this_data.T)
+    # average sin & cos terms (special property of sinusoids: power=A²/2)
+    hpi_power = (coefs[:n_freqs] ** 2 + coefs[n_freqs : (2 * n_freqs)] ** 2) / 2
+    resid = this_data - np.ascontiguousarray((model @ coefs).T)
+    # can't use np.var(..., axis=1) with Numba, so do it manually:
+    resid_mean = np.atleast_2d(resid.sum(axis=1) / resid.shape[1]).T
+    squared_devs = np.abs(resid - resid_mean) ** 2
+    resid_var = squared_devs.sum(axis=1) / squared_devs.shape[1]
+    # output array will be (n_freqs, 3 * n_ch_types). The 3 columns for each
+    # channel type are the SNR, the mean cHPI power and the residual variance
+    # (which gets tiled to shape (n_freqs,) because it's a scalar).
+    snrs = np.empty((n_freqs, 0))
+    # average power & compute residual variance separately for each ch type
+    for _picks in (mag_picks, grad_picks):
+        if len(_picks):
+            avg_power = hpi_power[:, _picks].sum(axis=1) / len(_picks)
+            avg_resid = resid_var[_picks].mean() * np.ones(n_freqs)
+            snr = 10 * np.log10(avg_power / avg_resid)
+            snrs = np.hstack((snrs, np.stack((snr, avg_power, avg_resid), 1)))
+    return snrs
+```
+
+A few things to note:
+
+- *There are several calls to `np.ascontiguousarray`*. Many NumPy functions are faster if performed on arrays stored in C-contiguous order in memory. Numba will warn you if it detects this.
+- *The `axis` parameter might not be allowed*. The comment on line 11 calls out one such case, so that future developers don't recognize the familiar formula for variance and try to speed things up by using `np.var`. Note that it's not *always* forbidden; on line 14 we see the `.sum(axis=1)` method called on an array. The Numba documentation is fairly clear about what is allowed, but in any case the Numba compiler will complain if you try to use a NumPy feature that it doesn't support.
+- *The `@jit` decorator is a wrapper*. In MNE-Python, we re-define Numba's decorator to still work even if the user doesn't have Numba installed. [See how we do it](https://github.com/mne-tools/mne-python/blob/f04fcaa851e64b379a1a107f18cf3fd5b6b18f42/mne/fixes.py#L600-L640).
