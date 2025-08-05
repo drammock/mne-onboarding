@@ -6,14 +6,14 @@ kernelspec:
 # Optimization and benchmarking
 
 > Programmers waste enormous amounts of time thinking about, or worrying about, the speed of noncritical parts of their programs, and these attempts at efficiency actually have a strong negative impact when debugging and maintenance are considered. We **should** forget about small efficiencies, say about 97% of the time: premature optimization is the root of all evil.
-> 
+>
 > Yet we should not pass up our opportunities in that critical 3%. A good programmer will not be lulled into complacency by such reasoning, he will be wise to look carefully at the critical code; but only **after** that code has been identified. It is often a mistake to make a priori judgments about what parts of a program are really critical, since the universal experience of programmers who have been using measurement tools has been that their intuitive guesses fail.
 
 — {cite}`10.1145/356635.356640`
 
 ## Definitions
 
-Benchmarking 
+Benchmarking
 : Running code (usually multiple times) and measuring the resources (CPU time, memory, disk space, and/or network usage) necessary to execute it. If the code takes inputs, benchmarking usually involves testing inputs of different sizes or types.
 
 Optimization
@@ -322,9 +322,35 @@ Generally speaking, there are a few patterns that (almost) always work to speed 
 
 ## Optimizing with Numba
 
-For complex computations that need to be called repeatedly (e.g., a computation applied to a window, where the window slides along a time series), rewriting the function to use Numba (which will just-in-time compile the function to optimized bytecode) might be worth the effort. Unfortunately, Numba only allows a subset of the NumPy API in functions that it compiles, so some re-writing may be necessary.
+For complex computations that need to be called repeatedly (e.g., a computation applied to a window, where the window slides along a time series), rewriting the function to use Numba might be worth the effort. Numba JIT (just-in-time) compiles code once based on its input arguments (e.g., dimensionality and dtypes), which can be slow—but any subsequent call with matching type and dimensionality will use that compiled code immediately. Unfortunately, Numba only allows a subset of the NumPy API in functions that it compiles, so some re-writing may be necessary.
 
-You can see an example of this in the MNE-Python code for computing the SNR of {abbr}`cHPI (continuous Head Position Indicator)` coils:
+### Using numba.jit
+
+Let's try it with our example above, starting with the naive two-loop code, but adding the decorator `@numba.jit(nopython=True)` and tweaking the `result` `dtype` in the function (which is otherwise unchanged):
+
+```{include} script_numba.py
+:lang: python
+:filename: false
+:start-line: 1
+:end-line: 11
+:linenos:
+:lineno-match:
+```
+
+```{code-cell} ipython
+%%bash
+
+python -m timeit -s "from script_numba import ARR, my_func, np; my_func(np.ones([1, 1], dtype=np.int64))" "my_func(ARR)"
+```
+There are a few notable things here:
+
+1. First, the speed is faster than the naive, `sum`, and `broadcast` code, rivaling NumPy's `@` directly. The `@` operator in NumPy calls highly optimized BLAS linear algebra routines, utilizing SIMD (single-instruction multiple-data) CPU instructions and multiple threads, so it can in some situations beat Numba. But Numba also can make use of SIMD instructions, so results can vary!
+2. We had to tweak the `dtype=int` to be `dtype=np.int64` for the `result` inside the loop. This is because `nopython` mode needs explicit NumPy dtypes. Another (maybe better) option here would be to use `dtype=input.dtype`.
+3. In the `timeit` call, we call the function once in the *setup* phase. This triggers the JIT compilation. From then on, it can be used by the repeated calls to `my_func` thaht `timeit` will do under the hood. Without this step, the JIT compilation time would (misleadingly) be included in the `timeit` stats.
+
+### A more complex example
+
+You can see a more complex example of this in the MNE-Python code for computing the SNR of {abbr}`cHPI (continuous Head Position Indicator)` coils:
 
 ```{code-block} python
 :linenos:
@@ -361,4 +387,4 @@ A few things to note:
 
 - *There are several calls to `np.ascontiguousarray`*. Many NumPy functions are faster if performed on arrays stored in C-contiguous order in memory. Numba will warn you if it detects this.
 - *The `axis` parameter might not be allowed*. The comment on line 11 calls out one such case, so that future developers don't recognize the familiar formula for variance and try to speed things up by using `np.var`. Note that it's not *always* forbidden; on line 14 we see the `.sum(axis=1)` method called on an array. The Numba documentation is fairly clear about what is allowed, but in any case the Numba compiler will complain if you try to use a NumPy feature that it doesn't support.
-- *The `@jit` decorator is a wrapper*. In MNE-Python, we re-define Numba's decorator to still work even if the user doesn't have Numba installed. [See how we do it](https://github.com/mne-tools/mne-python/blob/f04fcaa851e64b379a1a107f18cf3fd5b6b18f42/mne/fixes.py#L600-L640).
+- *The `@jit` decorator is a wrapper*. In MNE-Python, we re-define Numba's decorator to still work even if the user doesn't have Numba installed. We also set `nopython=True, nogil=True, fastmath=True, cache=True` in all in-repo `jit` calls by default. [See how we do it](https://github.com/mne-tools/mne-python/blob/f04fcaa851e64b379a1a107f18cf3fd5b6b18f42/mne/fixes.py#L600-L640).
