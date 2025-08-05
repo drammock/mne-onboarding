@@ -12,6 +12,6 @@ site:
   title: MNE-Python maintainer onboarding
   template: book-theme
   options:
-    folders: true
     logo: _static/mne_logo_small.svg
+    hide_toc: true
     # favicon: favicon.ico
