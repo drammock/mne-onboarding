@@ -12,11 +12,20 @@ Broadly speaking, an *environment* (or *virtual environment*) is a collection of
 ## Terminology
 
 :::{glossary}
+Lock file
+: A file listing *exact installed versions* of all packages in an environment (including transitive dependencies).
+
+Spec file
+: A file listing names and (optionally) version constraints (or "pins") for direct dependencies.
+
 Package index (or package registry)
 : A database of metadata about software packages (release date, version, author/maintainer, URL of source code, project website, *etc*).
 
 Package repository
 : A storehouse of software packages, from which they can be downloaded and installed.
+
+Task runner
+: A tool for storing and executing frequently-used commands. In the context of Python package development, common examples are "compile the package", "build the documentation", "run the unit tests", etc. Some task runners support interdependencies among tasks, so that (for example) asking it to build the docs will automatically recompile the package first if it detects that the compiled package is missing or out of date. See [this guide](https://learn.scientific-python.org/development/guides/tasks/) for more information.
 :::
 
 ## `venv`: the Python built-in environment manager
@@ -80,18 +89,20 @@ Like the `venv`+`pip`+`pipx` combination that it replaces, `uv` only manages Pyt
 :header: "", "Python built-in", "conda", "uv (venv)", "uv (project)", "pixi"
 :label: table-env-mgmt
 
-create env       , `python -m venv .venv`           , `conda create --name my_env`              , `uv venv`                                             , `uv init`                             ,
-activate env     , `source .venv/bin/activate`      , `conda activate my_env`                   , `source .venv/bin/activate`                           , n/a                                   ,
-deactivate env   , `deactivate`                     , `conda deactivate`                        , `deactivate`                                          , n/a                                   ,
-install into env , `pip install ...`                , `conda install ...`                       , `uv pip install ...`                                  , `uv add ...`                          ,
-install from file, `pip install -r requirements.txt`, `conda env create --file environment.yml` , `uv pip install -r requirements.txt`                  , `uv add -r requirements.txt`          ,
-remove from env  , `pip uninstall ...`              , `conda remove ...` [^conda_remove]        , `uv pip uninstall ...`                                , `uv remove ...` (project)             ,
-update dependency, `pip install --upgrade ...`      , `conda update ...`                        , `uv pip install --upgrade ...`                        , `uv sync` (also happens automatically),
-install globally , `pipx install ...`               , n/a                                       , n/a                                                   , `uv tool install ...`                 ,
-run once         , `pipx run ...`                   , `conda run --name my_env ...` [^conda_run], `uvx ...` [^uvx]                                      , `uv run ...` (within a project)       ,
-create lockfile  , n/a                              , `conda list --explicit > spec-file.txt`   , `uv pip freeze | uv pip compile - -o requirements.txt`, `uv lock` (also happens automatically),
+create env       , `python -m venv <envname>`                    , `conda create --name <envname>`              , `uv venv`                                             , `uv init`                             , `pixi init <foldername>`
+activate env     , `source <envname>/bin/activate` [^source_win] , `conda activate <envname>`                   , `source .venv/bin/activate`                           , n/a                                   , `pixi shell`
+deactivate env   , `deactivate`                                  , `conda deactivate`                           , `deactivate`                                          , n/a                                   , `exit`
+install into env , `pip install ...`                             , `conda install ...`                          , `uv pip install ...`                                  , `uv add ...`                          , `pixi add ...`
+install from file, `pip install -r requirements.txt`             , `conda env create --file environment.yml`    , `uv pip install -r requirements.txt`                  , `uv add -r requirements.txt`          ,
+remove from env  , `pip uninstall ...`                           , `conda remove ...` [^conda_remove]           , `uv pip uninstall ...`                                , `uv remove ...` (project)             ,
+update dependency, `pip install --upgrade ...`                   , `conda update ...`                           , `uv pip install --upgrade ...`                        , `uv sync` (also happens automatically),
+install globally , `pipx install ...`                            , n/a                                          , n/a                                                   , `uv tool install ...`                 , `pixi global install ...`
+run once         , `pipx run ...`                                , `conda run --name <envname> ...` [^conda_run], `uvx ...` [^uvx]                                      , `uv run ...` (within a project)       ,
+add a task       , n/a                                           , n/a                                          , n/a                                                   , n/a                                   , `pixi task add <taskname> <command>`
+create lockfile  , n/a                                           , `conda list --explicit > spec-file.txt`      , `uv pip freeze | uv pip compile - -o requirements.txt`, `uv lock`                             ,
 ```
 
+[^source_win]: omit `source` on Windows
 [^conda_remove]: `conda uninstall ...` also works
 [^conda_run]: `my_env` must already exist and have `my_executable` installed in it
 [^uvx]: alias for `uv tool run`
